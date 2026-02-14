@@ -1,1 +1,51 @@
-<script src="app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+<div class="container">
+    <div id="blog-ui" style="display:none;">
+        <div class="card">
+            <div style="display:flex; justify-content: space-between;">
+                <b id="user-display"></b>
+                <button onclick="location.reload()" style="width:auto; padding:5px; background:#ff7675;">Salir</button>
+            </div>
+            <hr>
+            <textarea id="msg" placeholder="¿Cuál es tu secreto?"></textarea>
+            <button onclick="crearBloque()">⛏️ Minar y Guardar Local</button>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                <button onclick="descargarJSON()" style="background:#2ecc71;">📥 Descargar JSON</button>
+                <button onclick="subirAlServidor()" style="background:#3498db;">☁️ Subir a la Nube</button>
+            </div>
+        </div>
+        <div id="feed"></div>
+    </div>
+</div>
+
+<script>
+    // ... (Mantener Clases Bloque y funciones de Auth anteriores) ...
+
+    function descargarJSON() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(blockchain));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `blockchain_${currentUser}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    async function subirAlServidor() {
+        const nombreArchivo = `blockchain_${currentUser}.json`;
+        const contenido = JSON.stringify(blockchain);
+        
+        const formData = new FormData();
+        formData.append('archivo_blockchain', new Blob([contenido], {type: 'application/json'}), nombreArchivo);
+
+        try {
+            const res = await fetch('https://piezas4websites.com/secrets/upload.php', { method: 'POST', body: formData });
+            const texto = await res.text();
+            alert("Respuesta del servidor: " + texto);
+        } catch (e) {
+            alert("Error al subir. ¿Ya configuraste el archivo PHP?");
+        }
+    }
+</script>
