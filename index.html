@@ -1,51 +1,181 @@
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Blogchain</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        :root { --primary: #6c5ce7; --secondary: #00cec9; --bg: #f8f9fa; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 500px; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        input, textarea { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; font-weight: bold; margin-top: 5px; transition: 0.3s; }
+        button:hover { filter: brightness(1.1); }
+        .post { background: white; border-left: 5px solid var(--primary); padding: 15px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .meta { font-size: 0.75em; color: #888; display: flex; justify-content: space-between; margin-bottom: 5px; }
+        .secreto { filter: blur(4px); background: #eee; }
+        .nav-links { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-nube { background: #3498db; }
+        .btn-explorar { background: #121212; text-decoration: none; display: block; text-align: center; color: white; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 0.9em; margin-top: 10px; }
+    </style>
+</head>
+<body>
 
 <div class="container">
+    <div id="auth-ui" class="card">
+        <h2 style="text-align:center; color: var(--primary);">🤫 Secret Blogchain</h2>
+        <input id="user" placeholder="Tu usuario local">
+        <input id="pass" type="password" placeholder="Tu contraseña">
+        <button onclick="handleAuth('registro')" style="background:#a29bfe;">Crear Cuenta Local</button>
+        <button onclick="handleAuth('login')">Entrar al Blog</button>
+    </div>
+
     <div id="blog-ui" style="display:none;">
         <div class="card">
-            <div style="display:flex; justify-content: space-between;">
+            <div style="display:flex; justify-content: space-between; align-items: center;">
                 <b id="user-display"></b>
-                <button onclick="location.reload()" style="width:auto; padding:5px; background:#ff7675;">Salir</button>
+                <button onclick="location.reload()" style="width:auto; padding:5px 10px; background:#ff7675;">Salir</button>
             </div>
             <hr>
-            <textarea id="msg" placeholder="¿Cuál es tu secreto?"></textarea>
-            <button onclick="crearBloque()">⛏️ Minar y Guardar Local</button>
+            <textarea id="msg" placeholder="Escribe un secreto para la red..."></textarea>
+            <label><input type="checkbox" id="publico" checked> Hacer público al subir</label>
+            <button onclick="crearBloque()">⛏️ Minar Bloque (Local)</button>
             
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
-                <button onclick="descargarJSON()" style="background:#2ecc71;">📥 Descargar JSON</button>
-                <button onclick="subirAlServidor()" style="background:#3498db;">☁️ Subir a la Nube</button>
+            <div class="nav-links">
+                <button onclick="descargarJSON()" style="background:#2ecc71;">📥 Bajar JSON</button>
+                <button onclick="subirAlServidor()" class="btn-nube">☁️ Subir a la Nube</button>
             </div>
+            
+            <a href="https://piezas4websites.com/secrets" target="_blank" class="btn-explorar">🌍 Ver Secretos Globales</a>
         </div>
         <div id="feed"></div>
     </div>
 </div>
 
 <script>
-    // ... (Mantener Clases Bloque y funciones de Auth anteriores) ...
+    // URL DEL SERVIDOR REMOTO
+    const URL_UPLOAD = 'https://piezas4websites.com/secrets/upload.php';
+
+    class Bloque {
+        constructor(index, timestamp, datos, autor, esPublico, hashPrevio = "") {
+            this.index = index;
+            this.timestamp = timestamp;
+            this.datos = datos;
+            this.autor = autor;
+            this.esPublico = esPublico;
+            this.hashPrevio = hashPrevio;
+            this.nonce = 0;
+            this.hash = this.calcularHash();
+        }
+        calcularHash() {
+            return CryptoJS.SHA256(this.index + this.hashPrevio + this.timestamp + JSON.stringify(this.datos) + this.autor + this.esPublico + this.nonce).toString();
+        }
+        minar(dificultad) {
+            let ceros = "0".repeat(dificultad);
+            while (this.hash.substring(0, dificultad) !== ceros) {
+                this.nonce++;
+                this.hash = this.calcularHash();
+            }
+        }
+    }
+
+    let currentUser = null;
+    let blockchain = [];
+    let usuarios = JSON.parse(localStorage.getItem('usuarios')) || [];
+
+    function handleAuth(tipo) {
+        const u = document.getElementById('user').value;
+        const p = document.getElementById('pass').value;
+        if(!u || !p) return alert("Ingresa datos");
+
+        if(tipo === 'registro') {
+            if(usuarios.find(x => x.u === u)) return alert("El usuario ya existe");
+            usuarios.push({u, p});
+            localStorage.setItem('usuarios', JSON.stringify(usuarios));
+            alert("Usuario registrado localmente");
+        } else {
+            const user = usuarios.find(x => x.u === u && x.p === p);
+            if(user) {
+                currentUser = u;
+                document.getElementById('auth-ui').style.display = 'none';
+                document.getElementById('blog-ui').style.display = 'block';
+                document.getElementById('user-display').innerText = "@" + u;
+                inicializarBC();
+            } else alert("Usuario o contraseña incorrectos");
+        }
+    }
+
+    function inicializarBC() {
+        const stored = localStorage.getItem('blockchain');
+        if(!stored) {
+            const genesis = new Bloque(0, new Date().toLocaleString(), "Génesis de la red", "Sistema", true, "0");
+            blockchain = [genesis];
+            save();
+        } else { blockchain = JSON.parse(stored); }
+        render();
+    }
+
+    function crearBloque() {
+        const msg = document.getElementById('msg').value;
+        const pub = document.getElementById('publico').checked;
+        if(!msg) return;
+
+        const ultimo = blockchain[blockchain.length - 1];
+        const nuevo = new Bloque(blockchain.length, new Date().toLocaleString(), msg, currentUser, pub, ultimo.hash);
+        nuevo.minar(2); // Dificultad de minado
+        blockchain.push(nuevo);
+        save();
+        document.getElementById('msg').value = "";
+        render();
+    }
+
+    function save() { localStorage.setItem('blockchain', JSON.stringify(blockchain)); }
+
+    function render() {
+        const feed = document.getElementById('feed');
+        feed.innerHTML = "";
+        [...blockchain].reverse().forEach(b => {
+            const esMio = b.autor === currentUser;
+            const ver = b.esPublico || esMio;
+            feed.innerHTML += `
+                <div class="post">
+                    <div class="meta"><b>@${b.autor}</b> <span>${b.timestamp}</span></div>
+                    <p class="${ver ? '' : 'secreto'}">${ver ? b.datos : 'Contenido privado bloqueado'}</p>
+                    <small style="font-size:0.5em; color:#ccc;">HASH: ${b.hash}</small>
+                </div>`;
+        });
+    }
 
     function descargarJSON() {
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(blockchain));
-        const downloadAnchorNode = document.createElement('a');
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `blockchain_${currentUser}.json`);
-        document.body.appendChild(downloadAnchorNode);
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
+        const blob = new Blob([JSON.stringify(blockchain, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bc_${currentUser}.json`;
+        a.click();
     }
 
     async function subirAlServidor() {
-        const nombreArchivo = `blockchain_${currentUser}.json`;
-        const contenido = JSON.stringify(blockchain);
+        if(blockchain.length < 2) return alert("Mina al menos un secreto antes de subir");
         
         const formData = new FormData();
-        formData.append('archivo_blockchain', new Blob([contenido], {type: 'application/json'}), nombreArchivo);
+        const blob = new Blob([JSON.stringify(blockchain)], {type: 'application/json'});
+        formData.append('archivo_blockchain', blob, `bc_${currentUser}.json`);
 
         try {
-            const res = await fetch('https://piezas4websites.com/secrets/upload.php', { method: 'POST', body: formData });
-            const texto = await res.text();
-            alert("Respuesta del servidor: " + texto);
+            const res = await fetch(URL_UPLOAD, { 
+                method: 'POST', 
+                mode: 'cors', // Crucial para peticiones entre dominios
+                body: formData 
+            });
+            const respuesta = await res.text();
+            alert("Respuesta Nube: " + respuesta);
         } catch (e) {
-            alert("Error al subir. ¿Ya configuraste el archivo PHP?");
+            alert("Error de conexión con piezas4websites.com. Revisa los permisos CORS en tu PHP.");
         }
     }
 </script>
+</body>
+</html>
