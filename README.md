@@ -1,3 +1,3 @@
 # blogchain-js_blockchain
 
-<a href="https://piezas4websites.com/secrets/">Secrets</a>
+<a href="https://syntaxsanctuary.com/secrets/">Secrets</a>
